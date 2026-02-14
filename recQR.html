@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Escáner Pro Tienda</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; }
+        #reader { width: 350px; border-radius: 10px; overflow: hidden; }
+        .info-card { background: white; padding: 20px; border-radius: 10px; margin-top: 20px; width: 310px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn-group { margin: 15px; }
+        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; margin: 5px; font-weight: bold; }
+        .active { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+
+    <h2>🛒 Escáner de Inventario</h2>
+    
+    <div class="btn-group">
+        <button id="btnVenta" class="active" onclick="setModo('buscar')">Modo Venta</button>
+        <button id="btnReg" onclick="setModo('registrar')">Modo Registro</button>
+    </div>
+
+    <div id="reader"></div>
+    
+    <div class="info-card" id="resultado">
+        Escanea un producto para comenzar...
+    </div>
+
+<script>
+    const SCRIPT_URL = "TU_URL_DE_APPS_SCRIPT_AQUI"; // REEMPLAZA ESTO
+    let modoActual = "buscar";
+
+    function setModo(m) {
+        modoActual = m;
+        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        if(m === 'buscar') document.getElementById('btnVenta').classList.add('active');
+        else document.getElementById('btnReg').classList.add('active');
+    }
+
+    async function onScanSuccess(codigo) {
+        // Pausamos el escaneo para procesar
+        html5QrcodeScanner.pause();
+        const display = document.getElementById('resultado');
+        display.innerHTML = "⏳ Consultando base de datos...";
+
+        let url = `${SCRIPT_URL}?accion=${modoActual}&codigo=${codigo}`;
+
+        if (modoActual === "registrar") {
+            const nombre = prompt("Nombre del nuevo producto:");
+            const precio = prompt("Precio:");
+            if (!nombre || !precio) { html5QrcodeScanner.resume(); return; }
+            url += `&nombre=${encodeURIComponent(nombre)}&precio=${encodeURIComponent(precio)}`;
+        }
+
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (modoActual === "buscar") {
+                if (data.encontrado) {
+                    display.innerHTML = `<h3>✅ ${data.nombre}</h3><p>Precio: $${data.precio}</p>`;
+                } else {
+                    display.innerHTML = `<h3 style="color:red">❌ No registrado</h3>`;
+                }
+            } else {
+                display.innerHTML = `<h3>✅ Registrado con éxito</h3>`;
+            }
+        } catch (e) {
+            display.innerHTML = "Error de conexión con Google Sheets.";
+        }
+
+        // Esperar 3 segundos y resumir escaneo
+        setTimeout(() => { 
+            display.innerHTML = "Listo para el siguiente...";
+            html5QrcodeScanner.resume(); 
+        }, 3000);
+    }
+
+    let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+    html5QrcodeScanner.render(onScanSuccess);
+</script>
+</body>
+</html>
